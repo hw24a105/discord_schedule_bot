@@ -316,6 +316,32 @@ async def on_message(message):
                     break
     await bot.process_commands(message)
 
+    # -----------------------------
+# 🌐 Flask 生存確認サーバー（Koyeb用）
+# -----------------------------
+from flask import Flask
+from threading import Thread
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "alive"
+
+import os
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))  # Koyebから渡されたPORTを使う
+    app.run(host="0.0.0.0", port=port)
+
+# Flask を別スレッドで起動
+flask_thread = Thread(target=run_flask)
+flask_thread.start()
+
+# -----------------------------
+# ▶️ 実行
+# -----------------------------
+
 # -----------------------------
 # ▶️ 実行
 # -----------------------------
