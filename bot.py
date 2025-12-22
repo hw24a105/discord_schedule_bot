@@ -5,10 +5,18 @@ from datetime import datetime, timedelta
 import os
 import asyncio
 from dotenv import load_dotenv
-import database  # database.py を別ファイルで用意
+import database  # database.py
 import re
-from datetime import datetime, timedelta
 import jaconv
+
+# JST用 現在時刻関数
+def now_jst():
+    return datetime.utcnow() + timedelta(hours=9)
+
+
+
+
+
 
 # -----------------------------
 # 📅 自然言語 → 日付パーサー
@@ -17,7 +25,7 @@ def parse_datetime(text: str) -> datetime:
     text = jaconv.z2h(text, digit=True, ascii=True)  # 全角→半角
     text = text.strip()
 
-    now = datetime.now()
+    now = now_jst()
 
     # -----------------------------
     # ★ 日本語の時間表現（11時 / 11時30分 / 午後3時）
@@ -123,8 +131,14 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True  # DMでの「OK」応答に必要
-bot = discord.Client(intents=intents)
-tree = app_commands.CommandTree(bot)
+#bot = discord.Client(intents=intents)
+#tree = app_commands.CommandTree(bot)
+
+from discord.ext import commands
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+tree = bot.tree
+
 
 database.init_db()  # DB初期化
 
@@ -269,7 +283,7 @@ async def help_cmd(interaction: discord.Interaction):
 # -----------------------------
 @tasks.loop(minutes=1)
 async def reminder_check():
-    now = datetime.now()
+    now = now_jst()
     schedules = database.get_upcoming_schedules()
 
     for s in schedules:
@@ -306,7 +320,10 @@ async def resend_if_unconfirmed(user, task, time_str, schedule_id, delay_minutes
 # -----------------------------
 @bot.event
 async def on_message(message):
-    if isinstance(message.channel, discord.DMChannel) and not message.author.bot:
+    if message.author.bot:
+        return
+
+    if isinstance(message.channel, discord.DMChannel):
         if message.content.lower().strip() == "ok":
             schedules = database.get_upcoming_schedules()
             for s in schedules:
@@ -314,9 +331,15 @@ async def on_message(message):
                     database.mark_confirmed(s[0])
                     await message.channel.send("✅ 通知を確認しました！")
                     break
+
     await bot.process_commands(message)
 
-    # -----------------------------
+
+    
+
+
+
+# -----------------------------
 # 🌐 Flask 生存確認サーバー（Koyeb用）
 # -----------------------------
 from flask import Flask
@@ -341,8 +364,5 @@ flask_thread.start()
 # -----------------------------
 # ▶️ 実行
 # -----------------------------
-
-# -----------------------------
-# ▶️ 実行
-# -----------------------------
+print("TOKEN:", repr(TOKEN))
 bot.run(TOKEN)
