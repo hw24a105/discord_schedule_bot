@@ -40,7 +40,14 @@ def get_upcoming_schedules():
     now_str = datetime.now().strftime("%Y-%m-%d-%H:%M")
 
     # 🔥 過去の予定をすべて削除（自動クリーニング）
-    c.execute("DELETE FROM schedules WHERE time < ?", (now_str,))
+    c.execute("""
+    DELETE FROM schedules
+    WHERE time < ?
+      AND notified = 1
+      AND confirmed = 1
+      AND repeat = 0
+    """, (now_str,))
+
     conn.commit()
 
     # 🔥 未来の予定だけ取得（通知管理も安全）
