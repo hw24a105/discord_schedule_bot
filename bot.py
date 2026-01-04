@@ -41,6 +41,12 @@ def parse_datetime(text: str) -> datetime:
         base_date = now
         text = text.replace("今日", "")
 
+    m = re.search(r"(\d{1,2})月(\d{1,2})日", text)
+    if m:
+        month, day = map(int, m.groups())
+        base_date = datetime(now.year, month, day)
+        text = re.sub(r"\d{1,2}月\d{1,2}日", "", text)
+
     # 来週の〇曜
     youbi = ["月", "火", "水", "木", "金", "土", "日"]
     m = re.search(r"来週の([月火水木金土日])曜?", text)
