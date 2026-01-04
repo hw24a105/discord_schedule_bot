@@ -22,105 +22,68 @@ def now_jst():
 # 📅 自然言語 → 日付パーサー
 # -----------------------------
 def parse_datetime(text: str) -> datetime:
-    text = jaconv.z2h(text, digit=True, ascii=True)  # 全角→半角
+    text = jaconv.z2h(text, digit=True, ascii=True)
     text = text.strip()
 
     now = now_jst()
+    base_date = now
 
     # -----------------------------
-    # ★ 日本語の時間表現（11時 / 11時30分 / 午後3時）
+    # 日付ワードを先に判定
+    # -----------------------------
+    if "明日" in text:
+        base_date = now + timedelta(days=1)
+        text = text.replace("明日", "")
+    elif "あさって" in text:
+        base_date = now + timedelta(days=2)
+        text = text.replace("あさって", "")
+    elif "今日" in text:
+        base_date = now
+        text = text.replace("今日", "")
+
+    # 来週の〇曜
+    youbi = ["月", "火", "水", "木", "金", "土", "日"]
+    m = re.search(r"来週の([月火水木金土日])曜?", text)
+    if m:
+        target = youbi.index(m.group(1))
+        today = now.weekday()
+        days_ahead = (7 + target - today) % 7 + 7
+        base_date = now + timedelta(days=days_ahead)
+        text = re.sub(r"来週の[月火水木金土日]曜?", "", text)
+
+    # -----------------------------
+    # 午前 / 午後
     # -----------------------------
     pm = False
-    # 午前午後対応
     if "午後" in text or "PM" in text.upper():
         pm = True
         text = text.replace("午後", "").replace("PM", "")
     if "午前" in text or "AM" in text.upper():
         text = text.replace("午前", "").replace("AM", "")
 
-    # 11時30分 / 11時30
+    # -----------------------------
+    # 時刻解析
+    # -----------------------------
     m = re.search(r"(\d{1,2})時(\d{1,2})分?", text)
     if m:
-        h = int(m.group(1))
-        mm = int(m.group(2))
+        h, mm = map(int, m.groups())
         if pm and h < 12:
             h += 12
-        return now.replace(hour=h, minute=mm, second=0, microsecond=0)
+        return base_date.replace(hour=h, minute=mm, second=0, microsecond=0)
 
-    # 11時
     m = re.search(r"(\d{1,2})時", text)
     if m:
         h = int(m.group(1))
         if pm and h < 12:
             h += 12
-        return now.replace(hour=h, minute=0, second=0, microsecond=0)
+        return base_date.replace(hour=h, minute=0, second=0, microsecond=0)
 
-    # -----------------------------
-    # 今日
-    # -----------------------------
-    if text.startswith("今日"):
-        m = re.search(r"(\d{1,2}):(\d{1,2})", text)
-        if m:
-            h, mm = map(int, m.groups())
-            return now.replace(hour=h, minute=mm)
-
-    # 明日
-    if text.startswith("明日"):
-        m = re.search(r"(\d{1,2}):(\d{1,2})", text)
-        if m:
-            h, mm = map(int, m.groups())
-            return (now + timedelta(days=1)).replace(hour=h, minute=mm)
-
-    # あさって
-    if text.startswith("あさって"):
-        m = re.search(r"(\d{1,2}):(\d{1,2})", text)
-        if m:
-            h, mm = map(int, m.groups())
-            return (now + timedelta(days=2)).replace(hour=h, minute=mm)
-
-    # -----------------------------
-    # 来週の〇曜
-    # -----------------------------
-    youbi = ["月", "火", "水", "木", "金", "土", "日"]
-    m = re.search(r"来週の([月火水木金土日])曜?", text)
-    if m:
-        target = youbi.index(m.group(1))
-        today = now.weekday()  # 月0〜日6
-        days_ahead = (7 + target - today) % 7 + 7
-
-        t = re.search(r"(\d{1,2}):(\d{1,2})", text)
-        if t:
-            h, mm = map(int, t.groups())
-            return (now + timedelta(days=days_ahead)).replace(hour=h, minute=mm)
-
-    # -----------------------------
-    # MM/DD HH:MM
-    # -----------------------------
-    m = re.match(r"(\d{1,2})/(\d{1,2}) (\d{1,2}):(\d{1,2})", text)
-    if m:
-        month, day, h, mm = map(int, m.groups())
-        year = now.year
-        return datetime(year, month, day, h, mm)
-
-    # YYYY/MM/DD HH:MM
-    m = re.match(r"(\d{4})/(\d{1,2})/(\d{1,2}) (\d{1,2}):(\d{1,2})", text)
-    if m:
-        year, month, day, h, mm = map(int, m.groups())
-        return datetime(year, month, day, h, mm)
-
-    # -----------------------------
-    # 時刻だけ（今日扱い） → 11:00、23:59
-    # -----------------------------
-    m = re.match(r"(\d{1,2}):(\d{1,2})$", text)
+    m = re.search(r"(\d{1,2}):(\d{1,2})", text)
     if m:
         h, mm = map(int, m.groups())
-        return now.replace(hour=h, minute=mm)
+        return base_date.replace(hour=h, minute=mm, second=0, microsecond=0)
 
-    # -----------------------------
-    # どれにも当てはまらない
-    # -----------------------------
     return None
-
 
 # -----------------------------
 # ⚙️ 初期設定
